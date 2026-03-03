@@ -22,7 +22,8 @@ import {
   setDoc,
   getDoc,
   where,
-  getCountFromServer
+  getCountFromServer,
+  deleteDoc
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -100,14 +101,25 @@ export const saveScore = async (user: User, score: number, mass: number, name: s
   if (!user) return;
 
   try {
-    // Check if user has a previous high score
-    const userScoreRef = doc(db, LEADERBOARD_PATH, user.uid);
-    const userScoreSnap = await getDoc(userScoreRef);
+    if (user.isAnonymous) {
+      // Anonymous: store 1 record (best)
+      const userScoreRef = doc(db, LEADERBOARD_PATH, user.uid);
+      const userScoreSnap = await getDoc(userScoreRef);
 
-    if (userScoreSnap.exists()) {
-      const data = userScoreSnap.data();
-      if (score > data.score) {
-        // Update only if new score is higher
+      if (userScoreSnap.exists()) {
+        const data = userScoreSnap.data();
+        if (score > data.score) {
+          // Update only if new score is higher
+          await setDoc(userScoreRef, {
+            name,
+            score,
+            mass,
+            timestamp: serverTimestamp(),
+            uid: user.uid
+          });
+        }
+      } else {
+        // Create new entry
         await setDoc(userScoreRef, {
           name,
           score,
@@ -117,14 +129,48 @@ export const saveScore = async (user: User, score: number, mass: number, name: s
         });
       }
     } else {
-      // Create new entry
-      await setDoc(userScoreRef, {
-        name,
-        score,
-        mass,
-        timestamp: serverTimestamp(),
-        uid: user.uid
-      });
+      // Signed in: store up to 3 best gameplays
+      const q = query(
+        collection(db, LEADERBOARD_PATH),
+        where("uid", "==", user.uid)
+      );
+      const snapshot = await getDocs(q);
+      const userScores = snapshot.docs.map(doc => ({ id: doc.id, score: doc.data().score }));
+      
+      // Sort descending by score
+      userScores.sort((a, b) => b.score - a.score);
+
+      if (userScores.length < 3) {
+        // Less than 3 scores, just add it
+        await addDoc(collection(db, LEADERBOARD_PATH), {
+          name,
+          score,
+          mass,
+          timestamp: serverTimestamp(),
+          uid: user.uid
+        });
+      } else {
+        // Has 3 or more scores. Check if new score is better than the lowest of the top 3
+        const lowestTop3 = userScores[2];
+        if (score > lowestTop3.score) {
+          // Replace the 3rd best score with the new score
+          const docRef = doc(db, LEADERBOARD_PATH, lowestTop3.id);
+          await setDoc(docRef, {
+            name,
+            score,
+            mass,
+            timestamp: serverTimestamp(),
+            uid: user.uid
+          });
+        }
+        
+        // Cleanup any extra scores beyond 3
+        if (userScores.length > 3) {
+          for (let i = 3; i < userScores.length; i++) {
+            await deleteDoc(doc(db, LEADERBOARD_PATH, userScores[i].id));
+          }
+        }
+      }
     }
   } catch (error) {
     console.error("Error saving score:", error);
