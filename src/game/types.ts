@@ -7,7 +7,6 @@ export interface Snake {
   angle: number;
   targetAngle: number;
   segments: Point[];
-  path: Point[];
   length: number;
   width: number;
   color: string;
@@ -18,6 +17,7 @@ export interface Snake {
   score: number;
   skin: string;
   pattern: string[];
+  boostAccumulator: number;
 }
 export interface Particle {
   x: number;

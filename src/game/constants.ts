@@ -1,10 +1,10 @@
-export const MAP_RADIUS = 7500;
+export const MAP_RADIUS = 10800;
 export const INITIAL_SNAKE_LENGTH = 20;
-export const BASE_SPEED = 10.2;
-export const BOOST_SPEED = 20.4;
+export const BASE_SPEED = 4;
+export const BOOST_SPEED = 8.6;
 export const TURN_SPEED = 0.06;
-export const FOOD_COUNT = 4500;
-export const BOT_COUNT = 99;
+export const FOOD_COUNT = 3000;
+export const BOT_COUNT = 50;
 export const SEGMENT_DISTANCE = 4;
 export const FOOD_SIZE_MIN = 8;
 export const FOOD_SIZE_MAX = 25;

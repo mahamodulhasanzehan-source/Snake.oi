@@ -55,87 +55,65 @@ export const drawCrown = (ctx: CanvasRenderingContext2D, x: number, y: number, a
 export const drawSnake = (ctx: CanvasRenderingContext2D, snake: Snake) => {
     if (snake.segments.length < 2) return;
 
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Draw from tail to head
+    for (let i = snake.segments.length - 1; i >= 0; i--) {
+        const seg = snake.segments[i];
+        const isHead = i === 0;
+        
+        const colorIndex = Math.floor(i / 4) % snake.pattern.length;
+        const baseColor = snake.pattern[colorIndex];
 
-    // 1. Draw Shadow/Outline
-    ctx.lineWidth = snake.width + 4;
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath();
-    ctx.moveTo(snake.segments[0].x, snake.segments[0].y);
-    for (let i = 1; i < snake.segments.length; i++) {
-      ctx.lineTo(snake.segments[i].x, snake.segments[i].y);
+        // Create a radial gradient for each segment to make it look spherical
+        const gradient = ctx.createRadialGradient(
+            seg.x, seg.y, snake.width * 0.1, 
+            seg.x, seg.y, snake.width * 0.5
+        );
+        
+        if (snake.isBoosting) {
+            gradient.addColorStop(0, '#FFFFFF');
+            gradient.addColorStop(0.4, baseColor);
+            gradient.addColorStop(1, darkenColor(baseColor, 30));
+        } else {
+            gradient.addColorStop(0, lightenColor(baseColor, 30));
+            gradient.addColorStop(0.5, baseColor);
+            gradient.addColorStop(1, darkenColor(baseColor, 40));
+        }
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(seg.x, seg.y, snake.width / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw Eyes on Head
+        if (isHead) {
+            const angle = snake.angle;
+            
+            ctx.fillStyle = 'white';
+            const eyeOffset = snake.width * 0.35;
+            const eyeSize = snake.width * 0.25;
+            
+            const leftEyeX = seg.x + Math.cos(angle - 0.6) * eyeOffset;
+            const leftEyeY = seg.y + Math.sin(angle - 0.6) * eyeOffset;
+            const rightEyeX = seg.x + Math.cos(angle + 0.6) * eyeOffset;
+            const rightEyeY = seg.y + Math.sin(angle + 0.6) * eyeOffset;
+            
+            // Draw white of eyes
+            ctx.beginPath(); ctx.arc(leftEyeX, leftEyeY, eyeSize, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(rightEyeX, rightEyeY, eyeSize, 0, Math.PI*2); ctx.fill();
+            
+            // Draw pupils
+            ctx.fillStyle = 'black';
+            const pupilOffset = eyeSize * 0.4;
+            const lookX = Math.cos(angle) * pupilOffset;
+            const lookY = Math.sin(angle) * pupilOffset;
+            
+            ctx.beginPath(); ctx.arc(leftEyeX + lookX, leftEyeY + lookY, eyeSize * 0.45, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(rightEyeX + lookX, rightEyeY + lookY, eyeSize * 0.45, 0, Math.PI*2); ctx.fill();
+        }
     }
-    ctx.stroke();
-
-    // 2. Draw Main Body
-    ctx.lineWidth = snake.width;
-    ctx.strokeStyle = snake.color;
-    
-    if (snake.isBoosting) {
-       const time = Date.now() / 100;
-       ctx.strokeStyle = lightenColor(snake.color, Math.sin(time) * 30 + 30);
-       ctx.shadowColor = snake.color;
-       ctx.shadowBlur = 20;
-    } else {
-       ctx.shadowBlur = 0;
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(snake.segments[0].x, snake.segments[0].y);
-    for (let i = 1; i < snake.segments.length; i++) {
-      ctx.lineTo(snake.segments[i].x, snake.segments[i].y);
-    }
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // 3. Draw Pattern
-    if (snake.pattern.length > 1) {
-       for (let i = 0; i < snake.segments.length; i += 6) {
-          const seg = snake.segments[i];
-          const nextSeg = snake.segments[i+1];
-          if (!nextSeg) continue;
-          
-          const colorIndex = Math.floor(i / 10) % snake.pattern.length;
-          const patternColor = snake.pattern[colorIndex];
-          
-          if (patternColor !== snake.color) {
-             ctx.beginPath();
-             ctx.moveTo(seg.x, seg.y);
-             ctx.lineTo(nextSeg.x, nextSeg.y);
-             ctx.lineWidth = snake.width * 0.8;
-             ctx.strokeStyle = patternColor;
-             ctx.stroke();
-          }
-       }
-    }
-
-    // 4. Draw Head
-    const head = snake.segments[0];
-    const angle = snake.angle;
-    
-    ctx.fillStyle = 'white';
-    const eyeOffset = snake.width / 3;
-    const eyeSize = snake.width / 3.5;
-    
-    const leftEyeX = head.x + Math.cos(angle - 0.8) * eyeOffset * 1.5;
-    const leftEyeY = head.y + Math.sin(angle - 0.8) * eyeOffset * 1.5;
-    const rightEyeX = head.x + Math.cos(angle + 0.8) * eyeOffset * 1.5;
-    const rightEyeY = head.y + Math.sin(angle + 0.8) * eyeOffset * 1.5;
-    
-    ctx.beginPath(); ctx.arc(leftEyeX, leftEyeY, eyeSize, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(rightEyeX, rightEyeY, eyeSize, 0, Math.PI*2); ctx.fill();
-    
-    ctx.fillStyle = 'black';
-    const pupilOffset = eyeSize * 0.3;
-    const lookX = Math.cos(angle) * pupilOffset;
-    const lookY = Math.sin(angle) * pupilOffset;
-    
-    ctx.beginPath(); ctx.arc(leftEyeX + lookX, leftEyeY + lookY, eyeSize/2, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(rightEyeX + lookX, rightEyeY + lookY, eyeSize/2, 0, Math.PI*2); ctx.fill();
 
     if (snake.id === 'player' || snake.name === 'THE_BOSS') {
-      drawCrown(ctx, head.x, head.y, snake.angle, snake.width);
+      drawCrown(ctx, snake.segments[0].x, snake.segments[0].y, snake.angle, snake.width);
     }
     
     ctx.fillStyle = 'white';
@@ -143,7 +121,7 @@ export const drawSnake = (ctx: CanvasRenderingContext2D, snake: Snake) => {
     ctx.textAlign = 'center';
     ctx.shadowColor = 'black';
     ctx.shadowBlur = 4;
-    ctx.fillText(snake.name, head.x, head.y - snake.width - 15);
+    ctx.fillText(snake.name, snake.segments[0].x, snake.segments[0].y - snake.width - 15);
     ctx.shadowBlur = 0;
 };
 

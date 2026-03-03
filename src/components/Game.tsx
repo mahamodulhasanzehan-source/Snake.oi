@@ -130,13 +130,8 @@ export default function Game() {
 
   const createSnake = (id: string, x: number, y: number, name: string, isBot: boolean, customSkin?: string): Snake => {
     const initialSegments = [];
-    const initialPath = [];
-    const delayFrames = 3;
-    for (let i = 0; i < INITIAL_SNAKE_LENGTH * delayFrames + 1; i++) {
-      initialPath.push({ x, y: y + i * (BASE_SPEED / delayFrames) });
-    }
     for (let i = 0; i < INITIAL_SNAKE_LENGTH; i++) {
-      initialSegments.push({ ...initialPath[i * delayFrames] });
+      initialSegments.push({ x, y: y + i * 5 });
     }
     
     const skins: string[] = ['orange', 'blue', 'green', 'purple', 'red', 'rainbow', 'usa', 'germany', 'france', 'brazil', 'matrix', 'ghost'];
@@ -167,7 +162,6 @@ export default function Game() {
       angle: -Math.PI / 2,
       targetAngle: -Math.PI / 2,
       segments: initialSegments,
-      path: initialPath,
       length: INITIAL_SNAKE_LENGTH,
       width: 20, // Base width
       color: pattern[0], // Base color
@@ -175,24 +169,25 @@ export default function Game() {
       name,
       isBot,
       dead: false,
-      score: 0,
+      score: 100, // Initial mass
       skin,
-      pattern
+      pattern,
+      boostAccumulator: 0
     };
   };
 
     const createFood = (id: number, x?: number, y?: number, value?: number): Food => {
-    const isSpecial = Math.random() > 0.95;
+    const isSpecial = Math.random() > 0.99;
     const pos = x !== undefined && y !== undefined ? {x, y} : randomPoint();
     const isDropped = value !== undefined;
-    const finalValue = isDropped ? value : (isSpecial ? 50 : 10);
+    const finalValue = isDropped ? value : (isSpecial ? 20 : Math.floor(Math.random() * 4) + 1);
     
     return {
       id,
       x: pos.x,
       y: pos.y,
-      size: finalValue > 10 ? Math.min(finalValue / 2, 25) : Math.max(4, finalValue),
-      color: finalValue > 10 ? '#FFD700' : (isSpecial ? '#FF00FF' : randomColor()),
+      size: Math.max(4, Math.min(finalValue * 2, 20)),
+      color: isDropped ? randomColor() : (isSpecial ? '#FF00FF' : randomColor()),
       value: finalValue
     };
   };
@@ -224,10 +219,10 @@ export default function Game() {
       if (snake.isBot) updateBotAI(snake);
       
       // Movement Physics
-      const speed = snake.isBoosting && snake.length > 10 ? BOOST_SPEED : BASE_SPEED;
+      const speed = snake.isBoosting && snake.score > 110 ? BOOST_SPEED : BASE_SPEED;
       
       // Smooth turning (tighter for smaller snakes)
-      const turnSpeed = Math.max(0.03, 0.1 - (snake.length * 0.0005));
+      const turnSpeed = Math.max(0.02, 0.12 - (snake.score * 0.000005));
       snake.angle = lerpAngle(snake.angle, snake.targetAngle, turnSpeed);
       
       // Move Head
@@ -240,39 +235,54 @@ export default function Game() {
          killSnake(snake);
       }
 
-      // Update Segments (Follow the exact path with fixed delay)
-      snake.path.unshift({ x: snake.x, y: snake.y });
-      const delayFrames = 3;
+      // Update Segments (Follow the leader / IK)
+      snake.segments[0] = { x: snake.x, y: snake.y };
+      const spacing = snake.width * 0.25; // Overlapping circles
       
-      snake.segments = [];
-      const numSegments = Math.floor(snake.length);
-      for (let i = 0; i < numSegments; i++) {
-         const pathIndex = Math.min(i * delayFrames, snake.path.length - 1);
-         snake.segments.push({ ...snake.path[pathIndex] });
-      }
-      
-      // Trim path
-      const maxPathLength = numSegments * delayFrames + 1;
-      if (snake.path.length > maxPathLength) {
-         snake.path.length = maxPathLength;
+      for (let i = 1; i < snake.segments.length; i++) {
+        const prev = snake.segments[i - 1];
+        const curr = snake.segments[i];
+        const dx = prev.x - curr.x;
+        const dy = prev.y - curr.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > spacing) {
+          const angle = Math.atan2(dy, dx);
+          curr.x = prev.x - Math.cos(angle) * spacing;
+          curr.y = prev.y - Math.sin(angle) * spacing;
+        }
       }
       
       // Boost Cost
-      if (snake.isBoosting && snake.length > 10) {
-        // Lose 0.2 length per frame (12 length per second at 60fps)
-        snake.length -= 0.2;
-        // Update width immediately based on new length
-        snake.width = Math.min(40, 20 + Math.log(snake.length) * 2);
+      if (snake.isBoosting && snake.score > 110) {
+        // Lose 15 mass per second (0.25 per frame at 60fps)
+        snake.score -= 0.25;
+        snake.boostAccumulator += 0.25 * 0.33; // 33% becomes pellets
         
-        // Drop tiny food particles trailing behind the tail
-        if (Math.random() < 0.2) { // More frequent drops
-           const tail = snake.segments[snake.segments.length - 1];
-           if (tail) {
-             dropFood(tail.x, tail.y, 2); // small value
-           }
+        if (snake.boostAccumulator >= 1) {
+          const dropValue = Math.floor(snake.boostAccumulator);
+          snake.boostAccumulator -= dropValue;
+          const tail = snake.segments[snake.segments.length - 1];
+          if (tail) {
+            dropFood(tail.x, tail.y, dropValue);
+          }
         }
-      } else if (snake.length <= 10) {
+      } else {
         snake.isBoosting = false;
+      }
+      
+      // Update length and width based on mass (score)
+      const effectiveMass = Math.min(snake.score, 40000);
+      snake.width = Math.max(20, 15 + Math.pow(effectiveMass, 0.35) * 1.5);
+      const targetLength = Math.max(20, Math.floor(effectiveMass / 10));
+      
+      // Add or remove segments to match targetLength
+      while (snake.segments.length < targetLength) {
+        const last = snake.segments[snake.segments.length - 1];
+        snake.segments.push({ x: last.x, y: last.y });
+      }
+      if (snake.segments.length > targetLength) {
+        snake.segments.length = targetLength;
       }
       
       // Collision with Food
@@ -315,7 +325,7 @@ export default function Game() {
       cameraRef.current.y += (playerRef.current.y - cameraRef.current.y) * 0.1;
       
       // Zoom out as snake grows
-      const targetZoom = Math.max(0.5, 1 - (playerRef.current.length / 500));
+      const targetZoom = Math.max(0.15, 15 / Math.sqrt(Math.max(playerRef.current.score, 225)));
       cameraRef.current.zoom += (targetZoom - cameraRef.current.zoom) * 0.05;
     } else if (botsRef.current.length > 0) {
       // Attract Mode: Follow a random bot or the biggest bot
@@ -477,13 +487,12 @@ export default function Game() {
         }
         
         // Head on Body
-        // We skip the first few segments of s2 to avoid self-collision (though i!=j handles that)
-        // and head-collision (handled above)
         let hit = false;
-        // Check every 3rd segment for performance
-        for (let k = 2; k < s2.segments.length; k += 3) {
+        // Check every 2nd segment for performance
+        // Start from segment 4 to avoid head-to-head immediate triggers
+        for (let k = 4; k < s2.segments.length; k += 2) {
           const seg = s2.segments[k];
-          if (getDistance(s1, seg) < (s1.width + s2.width)/2 * 0.8) { // 0.8 forgiveness
+          if (getDistance(s1, seg) < (s1.width + s2.width) * 0.4) {
              killSnake(s1);
              hit = true;
              break;
@@ -498,16 +507,18 @@ export default function Game() {
     if (snake.dead) return;
     snake.dead = true;
     
-    // Explode into food
-    // Value correlates directly to the size of the defeated snake
-    const totalValue = snake.length * 5; 
-    const drops = snake.segments.length;
+    // Total mass dropped: ~40% of victim mass
+    const totalValue = snake.score * 0.4; 
+    const drops = Math.min(snake.segments.length, 100); // Cap number of drops
     const valuePerDrop = totalValue / drops;
     
     for (let i = 0; i < drops; i++) {
-      const seg = snake.segments[i];
-      // Place along exact coordinates
-      dropFood(seg.x, seg.y, valuePerDrop);
+      const segIndex = Math.floor((i / drops) * snake.segments.length);
+      const seg = snake.segments[segIndex];
+      // Add some jitter to position
+      const jitterX = (Math.random() - 0.5) * snake.width;
+      const jitterY = (Math.random() - 0.5) * snake.width;
+      dropFood(seg.x + jitterX, seg.y + jitterY, valuePerDrop);
     }
     
     // Particle Explosion
