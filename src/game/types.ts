@@ -7,6 +7,7 @@ export interface Snake {
   angle: number;
   targetAngle: number;
   segments: Point[];
+  path: Point[];
   length: number;
   width: number;
   color: string;

@@ -2,29 +2,37 @@ import { Snake, Food, Particle } from './types';
 import { MAP_RADIUS, FOOD_GLOW } from './constants';
 import { lightenColor, darkenColor } from './utils';
 
-export const drawGrid = (ctx: CanvasRenderingContext2D, camera: {x: number, y: number, zoom: number}, canvasWidth: number, canvasHeight: number) => {
-    const gridSize = 100;
+export const drawDoodleBackground = (ctx: CanvasRenderingContext2D, camera: {x: number, y: number, zoom: number}, canvasWidth: number, canvasHeight: number) => {
+    const sectionSize = 1000;
     const viewportWidth = canvasWidth / camera.zoom;
     const viewportHeight = canvasHeight / camera.zoom;
     
-    const startX = Math.floor((camera.x - viewportWidth/2) / gridSize) * gridSize;
-    const endX = startX + viewportWidth + gridSize;
-    const startY = Math.floor((camera.y - viewportHeight/2) / gridSize) * gridSize;
-    const endY = startY + viewportHeight + gridSize;
+    const startX = Math.floor((camera.x - viewportWidth/2) / sectionSize) * sectionSize;
+    const endX = startX + viewportWidth + sectionSize;
+    const startY = Math.floor((camera.y - viewportHeight/2) / sectionSize) * sectionSize;
+    const endY = startY + viewportHeight + sectionSize;
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 2;
     
-    ctx.beginPath();
-    for (let x = startX; x < endX; x += gridSize) {
-      ctx.moveTo(x, startY);
-      ctx.lineTo(x, endY);
+    for (let x = startX; x < endX; x += sectionSize) {
+      for (let y = startY; y < endY; y += sectionSize) {
+        // Draw a unique squiggle for each section
+        ctx.beginPath();
+        const seed = (Math.abs(x) * 1337 + Math.abs(y) * 7331) % 10000;
+        let px = x;
+        let py = y;
+        ctx.moveTo(px, py);
+        
+        for (let i = 0; i < 20; i++) {
+          const angle = (seed + i * 45) * 0.1;
+          px += Math.cos(angle) * 100;
+          py += Math.sin(angle) * 100;
+          ctx.quadraticCurveTo(px - 50, py - 50, px, py);
+        }
+        ctx.stroke();
+      }
     }
-    for (let y = startY; y < endY; y += gridSize) {
-      ctx.moveTo(startX, y);
-      ctx.lineTo(endX, y);
-    }
-    ctx.stroke();
 };
 
 export const drawCrown = (ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, width: number) => {
@@ -155,8 +163,8 @@ export const drawWorld = (ctx: CanvasRenderingContext2D, camera: {x: number, y: 
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-camera.x, -camera.y);
 
-    // Draw Grid
-    drawGrid(ctx, camera, canvasWidth, canvasHeight);
+    // Draw Doodle Background
+    drawDoodleBackground(ctx, camera, canvasWidth, canvasHeight);
 
     // Draw Food
     food.forEach(f => drawFood(ctx, f));

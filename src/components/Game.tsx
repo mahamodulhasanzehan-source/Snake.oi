@@ -80,22 +80,26 @@ export default function Game() {
       const pos = randomPoint();
       const name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + (Math.random() > 0.5 ? `_${Math.floor(Math.random()*100)}` : '');
       
-      // Boss Bot (Index 0)
-      if (i === 0) {
-        const boss = createSnake(`bot_${i}`, pos.x, pos.y, "THE_BOSS", true, 'rainbow');
-        boss.score = 15000; // High mass
-        const targetLength = Math.floor(boss.score / 10);
-        // Pre-fill segments so it starts big
-        boss.segments = Array.from({ length: targetLength }).map(() => ({ x: pos.x, y: pos.y }));
-        return boss;
-      }
-      
-      // Varied Bots
       const bot = createSnake(`bot_${i}`, pos.x, pos.y, name, true);
-      // Randomize size
-      if (Math.random() > 0.7) {
-        bot.score = 500 + Math.random() * 2000;
+      
+      // Specific mass for top bots as requested
+      if (i === 0) {
+        bot.name = "THE_BOSS";
+        bot.skin = 'rainbow';
+        bot.score = 25000 + Math.random() * 5000; // 25k - 30k
+      } else if (i === 1) {
+        bot.score = 17000 + Math.random() * 13000; // 17k - 30k
+      } else if (i === 2) {
+        bot.score = 15000 + Math.random() * 15000; // 15k - 30k
+      } else {
+        // Other bots
+        bot.score = 100 + Math.random() * 5000;
+        if (Math.random() > 0.9) bot.score = 5000 + Math.random() * 10000;
       }
+
+      const targetLength = Math.max(20, Math.floor(bot.score / 10));
+      bot.segments = Array.from({ length: targetLength }).map(() => ({ x: pos.x, y: pos.y }));
+      bot.path = Array.from({ length: targetLength * 5 }).map(() => ({ x: pos.x, y: pos.y }));
       return bot;
     });
     
@@ -154,6 +158,7 @@ export default function Game() {
       angle: -Math.PI / 2,
       targetAngle: -Math.PI / 2,
       segments: initialSegments,
+      path: [{ x, y }],
       length: INITIAL_SNAKE_LENGTH,
       width: 20, // Base width
       color: pattern[0], // Base color
@@ -227,22 +232,24 @@ export default function Game() {
          killSnake(snake);
       }
 
-      // Update Segments (Follow the leader / IK)
-      snake.segments[0] = { x: snake.x, y: snake.y };
-      const spacing = snake.width * 0.25; // Overlapping circles
+      // Update Segments (Path-based for stability)
+      snake.path.unshift({ x: snake.x, y: snake.y });
       
-      for (let i = 1; i < snake.segments.length; i++) {
-        const prev = snake.segments[i - 1];
-        const curr = snake.segments[i];
-        const dx = prev.x - curr.x;
-        const dy = prev.y - curr.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist > spacing) {
-          const angle = Math.atan2(dy, dx);
-          curr.x = prev.x - Math.cos(angle) * spacing;
-          curr.y = prev.y - Math.sin(angle) * spacing;
-        }
+      const spacing = 4; // Fixed spacing between path points
+      const segmentInterval = Math.max(1, Math.floor(snake.width * 0.25 / spacing));
+      
+      const targetLength = Math.max(20, Math.floor(Math.min(snake.score, 40000) / 10));
+      snake.segments = [];
+      
+      for (let i = 0; i < targetLength; i++) {
+        const pathIndex = Math.min(i * segmentInterval, snake.path.length - 1);
+        snake.segments.push({ ...snake.path[pathIndex] });
+      }
+      
+      // Trim path to prevent memory leaks
+      const maxPathLength = targetLength * segmentInterval + 10;
+      if (snake.path.length > maxPathLength) {
+        snake.path.length = maxPathLength;
       }
       
       // Boost Cost
@@ -263,19 +270,9 @@ export default function Game() {
         snake.isBoosting = false;
       }
       
-      // Update length and width based on mass (score)
+      // Update width based on mass (score)
       const effectiveMass = Math.min(snake.score, 40000);
       snake.width = Math.max(20, 15 + Math.pow(effectiveMass, 0.35) * 1.5);
-      const targetLength = Math.max(20, Math.floor(effectiveMass / 10));
-      
-      // Add or remove segments to match targetLength
-      while (snake.segments.length < targetLength) {
-        const last = snake.segments[snake.segments.length - 1];
-        snake.segments.push({ x: last.x, y: last.y });
-      }
-      if (snake.segments.length > targetLength) {
-        snake.segments.length = targetLength;
-      }
       
       // Collision with Food
       for (let i = foodRef.current.length - 1; i >= 0; i--) {
