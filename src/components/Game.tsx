@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { LeaderboardModal } from './LeaderboardModal';
 import { saveScore, signInGuest, signInWithGoogle, signOutUser, auth, getGlobalRank } from '../services/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Snake, Food, Point } from '../game/types';
@@ -14,6 +15,7 @@ export default function Game() {
   const [gameState, setGameState] = useState<'MENU' | 'PLAYING' | 'GAMEOVER'>('MENU');
   const gameStateRef = useRef<'MENU' | 'PLAYING' | 'GAMEOVER'>('MENU');
   const [score, setScore] = useState(0);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [playerName, setPlayerName] = useState('');
   const playerNameRef = useRef('');
   const [user, setUser] = useState<User | null>(null);
@@ -47,10 +49,11 @@ export default function Game() {
       setUser(u);
       userRef.current = u;
       if (u && !u.isAnonymous) {
-        // If we have a real user, update the name
-        const name = u.displayName || `Player_${u.uid.slice(0,4)}`;
-        setPlayerName(name);
-        playerNameRef.current = name;
+        // If we have a real user, update the name to their last name
+        const nameParts = u.displayName ? u.displayName.trim().split(' ') : [];
+        const lastName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : `Player_${u.uid.slice(0,4)}`;
+        setPlayerName(lastName);
+        playerNameRef.current = lastName;
       } else if (u && !playerNameRef.current) {
         // Anonymous fallback
         const name = `Guest_${u.uid.substring(0, 4)}`;
@@ -77,16 +80,16 @@ export default function Game() {
       const pos = randomPoint();
       const name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + (Math.random() > 0.5 ? `_${Math.floor(Math.random()*100)}` : '');
       
-      // Boss Bots (Top 5)
-      if (i < 5) {
-        const boss = createSnake(`bot_${i}`, pos.x, pos.y, i === 0 ? "THE_BOSS" : `ELDER_${i}`, true, 'rainbow');
-        // Make boss huge (50k points approx -> length ~ 2500)
-        boss.length = 2500 - (i * 300);
+      // Boss Bot (Index 0)
+      if (i === 0) {
+        const boss = createSnake(`bot_${i}`, pos.x, pos.y, "THE_BOSS", true, 'rainbow');
+        // Make boss huge (20k points approx -> length ~ 1000)
+        boss.length = 1000;
         boss.width = 40; // Max width
-        boss.score = boss.length * 20;
+        boss.score = 20000;
         // Pre-fill segments for length
         const delayFrames = 3;
-        const extraSegments = boss.length - INITIAL_SNAKE_LENGTH;
+        const extraSegments = 1000 - INITIAL_SNAKE_LENGTH;
         for (let j = 0; j < extraSegments * delayFrames; j++) {
            boss.path.push({ x: pos.x, y: pos.y }); // Just stack them for now, they will spread out
         }
@@ -95,13 +98,9 @@ export default function Game() {
       
       // Varied Bots
       const bot = createSnake(`bot_${i}`, pos.x, pos.y, name, true);
-      // Randomize size - Make them bigger on average
-      if (Math.random() > 0.5) {
-        bot.length = 500 + Math.random() * 1000; // Big bots (10k - 30k score)
-        bot.width = Math.min(40, 20 + Math.log(bot.length) * 2);
-        bot.score = bot.length * 20;
-      } else {
-        bot.length = 100 + Math.random() * 400; // Medium bots
+      // Randomize size
+      if (Math.random() > 0.7) {
+        bot.length = 50 + Math.random() * 200;
         bot.width = Math.min(40, 20 + Math.log(bot.length) * 2);
         bot.score = bot.length * 20;
       }
@@ -260,8 +259,8 @@ export default function Game() {
       
       // Boost Cost
       if (snake.isBoosting && snake.length > 10) {
-        // Lose 0.1 length per frame (reduced by 50%)
-        snake.length -= 0.1;
+        // Lose 0.2 length per frame (12 length per second at 60fps)
+        snake.length -= 0.2;
         // Update width immediately based on new length
         snake.width = Math.min(40, 20 + Math.log(snake.length) * 2);
         
@@ -619,9 +618,6 @@ export default function Game() {
       if (u) {
         setUser(u);
         userRef.current = u;
-        const name = u.displayName || `Player_${u.uid.slice(0,4)}`;
-        setPlayerName(name);
-        playerNameRef.current = name;
       }
     } catch (e) {
       console.error(e);
@@ -698,6 +694,7 @@ export default function Game() {
           onStartGame={handleStartGame}
           onGoogleLogin={handleGoogleLogin}
           onSignOut={() => setShowSignOutModal(true)}
+          onOpenLeaderboard={() => setLeaderboardOpen(true)}
         />
       )}
 
@@ -729,6 +726,13 @@ export default function Game() {
         globalRank={globalRank}
         onPlayAgain={initGame}
         onMainMenu={() => setGameState('MENU')}
+      />
+
+      {/* LEADERBOARD MODAL */}
+      <LeaderboardModal 
+        isOpen={leaderboardOpen} 
+        onClose={() => setLeaderboardOpen(false)} 
+        currentScore={score}
       />
     </div>
   );

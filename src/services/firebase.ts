@@ -4,8 +4,7 @@ import {
   signInAnonymously, 
   onAuthStateChanged, 
   GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signOut,
   User 
 } from "firebase/auth";
@@ -64,26 +63,10 @@ export const signInGuest = async () => {
 export const signInWithGoogle = async () => {
   try {
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
-    // The user will be redirected, so we don't return a user here immediately.
-    // The app should listen to onAuthStateChanged or getRedirectResult() on load.
-    return null;
+    const result = await signInWithPopup(auth, provider);
+    return result.user;
   } catch (error) {
     console.error("Error signing in with Google:", error);
-    throw error;
-  }
-};
-
-// Add a helper to check for redirect results on load
-export const checkRedirectResult = async () => {
-  try {
-    const result = await getRedirectResult(auth);
-    if (result) {
-      return result.user;
-    }
-    return null;
-  } catch (error) {
-    console.error("Error getting redirect result:", error);
     throw error;
   }
 };
