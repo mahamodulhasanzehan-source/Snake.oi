@@ -83,16 +83,10 @@ export default function Game() {
       // Boss Bot (Index 0)
       if (i === 0) {
         const boss = createSnake(`bot_${i}`, pos.x, pos.y, "THE_BOSS", true, 'rainbow');
-        // Make boss huge (20k points approx -> length ~ 1000)
-        boss.length = 1000;
-        boss.width = 40; // Max width
-        boss.score = 20000;
-        // Pre-fill segments for length
-        const delayFrames = 3;
-        const extraSegments = 1000 - INITIAL_SNAKE_LENGTH;
-        for (let j = 0; j < extraSegments * delayFrames; j++) {
-           boss.path.push({ x: pos.x, y: pos.y }); // Just stack them for now, they will spread out
-        }
+        boss.score = 15000; // High mass
+        const targetLength = Math.floor(boss.score / 10);
+        // Pre-fill segments so it starts big
+        boss.segments = Array.from({ length: targetLength }).map(() => ({ x: pos.x, y: pos.y }));
         return boss;
       }
       
@@ -100,9 +94,7 @@ export default function Game() {
       const bot = createSnake(`bot_${i}`, pos.x, pos.y, name, true);
       // Randomize size
       if (Math.random() > 0.7) {
-        bot.length = 50 + Math.random() * 200;
-        bot.width = Math.min(40, 20 + Math.log(bot.length) * 2);
-        bot.score = bot.length * 20;
+        bot.score = 500 + Math.random() * 2000;
       }
       return bot;
     });

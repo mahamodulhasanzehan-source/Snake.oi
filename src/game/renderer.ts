@@ -1,6 +1,6 @@
 import { Snake, Food, Particle } from './types';
 import { MAP_RADIUS, FOOD_GLOW } from './constants';
-import { lightenColor } from './utils';
+import { lightenColor, darkenColor } from './utils';
 
 export const drawGrid = (ctx: CanvasRenderingContext2D, camera: {x: number, y: number, zoom: number}, canvasWidth: number, canvasHeight: number) => {
     const gridSize = 100;
